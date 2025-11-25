@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WebSocket Listener</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      #messages {
+        border: 1px solid #ccc;
+        padding: 10px;
+        height: 300px;
+        overflow-y: scroll;
+        white-space: pre-wrap;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>WebSocket Listener</h2>
+    <div id="messages"></div>
+
+    <script>
+      const messagesDiv = document.getElementById("messages");
+      const ws = new WebSocket("ws://localhost:8765");
+
+      ws.onopen = () => {
+        console.log("Connected to WebSocket server");
+        ws.send("__register_streamlit__"); 
+      };
+
+      function displayObject(obj, container) {
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            const value = obj[key];
+            const line = document.createElement("div");
+
+            if (typeof value === "object" && value !== null) {
+              line.textContent = `${key}:`;
+              container.appendChild(line);
+              
+              const nestedContainer = document.createElement("div");
+              nestedContainer.style.marginLeft = "20px";
+              container.appendChild(nestedContainer);
+              displayObject(value, nestedContainer);
+            } else {
+              line.textContent = `${key}: ${value}`;
+              container.appendChild(line);
+            }
+          }
+        }
+      }
+
+      ws.onmessage = (event) => {
+        const msg = event.data;
+
+        let parsed;
+        try {
+          parsed = JSON.parse(msg);
+          
+          if (
+            parsed.lyzr_response &&
+            typeof parsed.lyzr_response === "string"
+          ) {
+            try {
+              parsed.lyzr_response = JSON.parse(parsed.lyzr_response);
+            } catch {}
+          }
+        } catch {
+          parsed = { message: msg };
+        }
+
+        const msgContainer = document.createElement("div");
+        msgContainer.style.borderBottom = "1px solid #ccc";
+        msgContainer.style.padding = "5px 0";
+        displayObject(parsed, msgContainer);
+
+        messagesDiv.appendChild(msgContainer);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight; 
+      };
+
+      ws.onclose = () => {
+        const p = document.createElement("p");
+        p.textContent = "Disconnected from WebSocket server";
+        messagesDiv.appendChild(p);
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+    </script>
+  </body>
+</html>
