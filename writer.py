@@ -88,8 +88,58 @@ async def process_prs_and_forward(listener_ws, prs):
                         listener_client = None
 
 async def ws_process_request(path, request_headers):
-    method = request_headers.get("Method", "")
-    
+    # method header is not standard in WebSocket handshake.
+    # So browsers won't send it. Fall back to normal behavior.
+    method = request_headers.get("Method")
+    if method:
+        method = method.upper()
+    else:
+        method = "GET"  # assume GET for WebSocket upgrade requests
+
+    # Allow GET (normal WebSocket), reject anything else
+    if method != "GET":
+        # Handle browser preflights safely
+        if method in ["HEAD", "OPTIONS"]:
+            return (
+                200,
+                [
+                    ("Access-Control-Allow-Origin", "*"),
+                    ("Access-Control-Allow-Headers", "*"),
+                    ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
+                ],
+                b""
+            )
+        return (
+            405,
+            [("Content-Type", "text/plain")],
+            b"Method Not Allowed"
+        )
+
+    # Validate WebSocket upgrade headers
+    connection_hdr = request_headers.get("Connection", "") or ""
+    upgrade_hdr = request_headers.get("Upgrade", "") or ""
+
+    if "upgrade" not in connection_hdr.lower():
+        return (
+            426,
+            [("Content-Type", "text/plain")],
+            b"Upgrade Required"
+        )
+
+    if upgrade_hdr.lower() != "websocket":
+        return (
+            400,
+            [("Content-Type", "text/plain")],
+            b"Bad Request: Expected WebSocket upgrade"
+        )
+
+    # Allow all origins
+    origin = request_headers.get("Origin")
+    if origin:
+        return None  # proceed with the WebSocket handshake normally
+
+    return None
+
     
     if method and method.upper() != "GET":
         return (
@@ -211,3 +261,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
