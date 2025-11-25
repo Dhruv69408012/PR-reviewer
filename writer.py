@@ -87,6 +87,27 @@ async def process_prs_and_forward(listener_ws, prs):
                         global listener_client
                         listener_client = None
 
+async def ws_process_request(path, request_headers):
+    method = request_headers.get("Method", "")
+    
+    
+    if method and method.upper() != "GET":
+        return (
+            405,
+            [("Content-Type", "text/plain")],
+            b"Method Not Allowed",
+        )
+    
+    # Also block non-WebSocket upgrade attempts
+    if "upgrade" not in request_headers.get("Connection", "").lower():
+        return (
+            426,
+            [("Content-Type", "text/plain")],
+            b"Upgrade Required",
+        )
+    
+    return None  # Continue with WebSocket handshake
+
 
 # -------------------- WebSocket listener --------------------
 
@@ -123,8 +144,14 @@ async def ws_handler(websocket):
 
 
 async def start_ws_server():
-    server = await websockets.serve(ws_handler, "localhost", 8765)
+    server = await websockets.serve(
+        ws_handler,
+        "0.0.0.0",
+        8765,
+        process_request=ws_process_request
+    )
     await server.wait_closed()
+
 
 
 # -------------------- FastAPI webhook --------------------
