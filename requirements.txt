@@ -1,0 +1,10 @@
+asyncio
+websockets
+fastapi 
+uvicorn
+threading
+httpx
+os
+dotenv
+json
+requests
